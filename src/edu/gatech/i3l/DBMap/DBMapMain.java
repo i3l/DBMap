@@ -212,17 +212,17 @@ public class DBMapMain {
 			stmtOMOP = connOMOP.createStatement();
 
 			rsExact = stmtExact.executeQuery("SELECT * FROM PROVIDER");
-			rsOMOP = stmtOMOP
-					.executeQuery("SELECT CARE_SITE_ID FROM CARE_SITE ORDER BY CARE_SITE_ID DESC");
-			if (rsOMOP.next()) {
-				new_care_site_id = rsOMOP.getLong("care_site_id");
-			}
+//			rsOMOP = stmtOMOP
+//					.executeQuery("SELECT CARE_SITE_ID FROM CARE_SITE ORDER BY CARE_SITE_ID DESC");
+//			if (rsOMOP.next()) {
+//				new_care_site_id = rsOMOP.getLong("care_site_id");
+//			}
 
-			rsOMOP = stmtOMOP
-					.executeQuery("SELECT PROVIDER_ID FROM PROVIDER ORDER BY PROVIDER_ID DESC");
-			if (rsOMOP.next()) {
-				provider_id = rsOMOP.getLong("PROVIDER_ID");
-			}
+//			rsOMOP = stmtOMOP
+//					.executeQuery("SELECT PROVIDER_ID FROM PROVIDER ORDER BY PROVIDER_ID DESC");
+//			if (rsOMOP.next()) {
+//				provider_id = rsOMOP.getLong("PROVIDER_ID");
+//			}
 
 			while (rsExact.next()) {
 				String exactDataLocation = rsExact.getString("LOCATION");
@@ -306,27 +306,32 @@ public class DBMapMain {
 									+ ", care_site_source=" + exactDataLocation
 									+ ") exists");
 						} else {
-							care_site_id = ++new_care_site_id;
+//							care_site_id = ++new_care_site_id;
 							String SQL_CARE_SITE_INSERT = "INSERT INTO CARE_SITE "
-									+ "(CARE_SITE_ID, ORGANIZATION_ID, PLACE_OF_SERVICE_CONCEPT_ID, CARE_SITE_SOURCE_VALUE, PLACE_OF_SERVICE_SOURCE_VALUE) VALUES "
-									+ "(?, ?, ?, ?, ?)";
+									+ "(ORGANIZATION_ID, PLACE_OF_SERVICE_CONCEPT_ID, CARE_SITE_SOURCE_VALUE, PLACE_OF_SERVICE_SOURCE_VALUE) VALUES "
+									+ "(?, ?, ?, ?)";
 							pstmtOMOP = connOMOP
-									.prepareStatement(SQL_CARE_SITE_INSERT);
-							pstmtOMOP.setLong(1, care_site_id);
-							pstmtOMOP.setLong(2, organization_id);
-							pstmtOMOP.setLong(3, place_of_service_concept_id);
+									.prepareStatement(SQL_CARE_SITE_INSERT, Statement.RETURN_GENERATED_KEYS);
+							pstmtOMOP.setLong(1, organization_id);
+							pstmtOMOP.setLong(2, place_of_service_concept_id);
 							// if (exactDataLocation.length()>50) {
 							// exactDataLocation =
 							// exactDataLocation.substring(0, 49);
 							// }
-							pstmtOMOP.setString(4, exactDataLocation);
-							pstmtOMOP.setString(5, place_of_service_source);
+							pstmtOMOP.setString(3, exactDataLocation);
+							pstmtOMOP.setString(4, place_of_service_source);
 
+							pstmtOMOP.executeUpdate();
+
+							ResultSet tableKeys = pstmtOMOP.getGeneratedKeys();
+							tableKeys.next();
+							care_site_id = tableKeys.getInt(1);
+//							care_site_id = new_care_site_id;
+							
 							System.out.println("Adding New Care Site ("
 									+ care_site_id + ") for care site="
 									+ exactDataLocation);
-							pstmtOMOP.executeUpdate();
-
+							
 						}
 
 					} else {
@@ -349,13 +354,13 @@ public class DBMapMain {
 				}
 
 				String SQL_PROVIDER_INSERT = "INSERT INTO PROVIDER "
-						+ "(PROVIDER_ID, NPI, SPECIALTY_CONCEPT_ID, CARE_SITE_ID, PROVIDER_SOURCE_VALUE, SPECIALTY_SOURCE_VALUE) VALUES "
-						+ "(?, ?, ?, ?, ?, ?)";
+						+ "(NPI, SPECIALTY_CONCEPT_ID, CARE_SITE_ID, PROVIDER_SOURCE_VALUE, SPECIALTY_SOURCE_VALUE) VALUES "
+						+ "(?, ?, ?, ?, ?)";
 
-				pstmtOMOP = connOMOP.prepareStatement(SQL_PROVIDER_INSERT);
-				provider_id++;
-				pstmtOMOP.setLong(1, provider_id);
-				pstmtOMOP.setLong(2, Long.parseLong(provider_npi));
+				pstmtOMOP = connOMOP.prepareStatement(SQL_PROVIDER_INSERT, Statement.RETURN_GENERATED_KEYS);
+				// provider_id++;
+//				pstmtOMOP.setLong(1, provider_id);
+				pstmtOMOP.setLong(1, Long.parseLong(provider_npi));
 
 				// get specialty concept code.
 				String ExactSpecialty = rsExact.getString("SPECIALTY");
@@ -385,23 +390,28 @@ public class DBMapMain {
 							.executeQuery("SELECT * FROM CONCEPT WHERE VOCABULARY_ID=48 AND CONCEPT_NAME LIKE '%"
 									+ ExactSpecialty + "%'");
 					if (rsOMOP.next()) {
-						pstmtOMOP.setLong(3, rsOMOP.getLong("CONCEPT_ID"));
+						pstmtOMOP.setLong(2, rsOMOP.getLong("CONCEPT_ID"));
 						pstmtOMOP
-								.setString(6, rsOMOP.getString("CONCEPT_NAME"));
+								.setString(5, rsOMOP.getString("CONCEPT_NAME"));
 					} else {
-						pstmtOMOP.setNull(3, Types.NULL);
-						pstmtOMOP.setNull(6, Types.NULL);
+						pstmtOMOP.setNull(2, Types.NULL);
+						pstmtOMOP.setNull(5, Types.NULL);
 					}
 				} else {
-					pstmtOMOP.setNull(3, Types.NULL);
-					pstmtOMOP.setNull(6, Types.NULL);
+					pstmtOMOP.setNull(2, Types.NULL);
+					pstmtOMOP.setNull(5, Types.NULL);
 				}
-				pstmtOMOP.setLong(4, care_site_id);
-				pstmtOMOP.setString(5, rsExact.getString("Provider_ID"));
+				pstmtOMOP.setLong(3, care_site_id);
+				pstmtOMOP.setString(4, rsExact.getString("Provider_ID"));
 				pstmtOMOP.executeUpdate();
+
+				ResultSet tableKeys = pstmtOMOP.getGeneratedKeys();
+				tableKeys.next();
+				provider_id = tableKeys.getInt(1);
 
 				System.out.println("New provider (" + provider_id
 						+ ") is added.");
+
 
 				pstmtOMOP = connOMOP
 						.prepareStatement("INSERT INTO F_PROVIDER (PROVIDER_ID, NAME, YEAR_OF_BIRTH, MONTH_OF_BIRTH, DAY_OF_BIRTH, GENDER_CONCEPT_ID) VALUES "
@@ -464,36 +474,36 @@ public class DBMapMain {
 
 			pstmtOMOPEpisode = connOMOP
 					.prepareStatement("INSERT INTO EPISODE_OF_CARE "
-							+ "(EPISODE_OF_CARE_ID, PERSON_ID, EPISODE_SOURCE_VALUE) VALUES "
-							+ "(?, ?, ?)");
+							+ "(PERSON_ID, EPISODE_SOURCE_VALUE) VALUES "
+							+ "(?, ?)", Statement.RETURN_GENERATED_KEYS);
 			pstmtOMOPVisit = connOMOP
 					.prepareStatement("INSERT INTO VISIT_OCCURRENCE "
-							+ "(VISIT_OCCURRENCE_ID, PERSON_ID, VISIT_START_DATE, VISIT_END_DATE, PLACE_OF_SERVICE_CONCEPT_ID, CARE_SITE_ID, PLACE_OF_SERVICE_SOURCE_VALUE) VALUES "
-							+ "(?, ?, ?, ?, ?, ?, ?)");
+							+ "(PERSON_ID, VISIT_START_DATE, VISIT_END_DATE, PLACE_OF_SERVICE_CONCEPT_ID, CARE_SITE_ID, PLACE_OF_SERVICE_SOURCE_VALUE) VALUES "
+							+ "(?, ?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS);
 			pstmtOMOPVisitF = connOMOP
 					.prepareStatement("INSERT INTO F_VISIT_OCCURRENCE "
 							+ "(VISIT_OCCURRENCE_ID, EPISODE_OF_CARE_ID, NOTE) VALUES "
 							+ "(?, ?, ?)");
 			pstmtOMOPCondition1 = connOMOP
 					.prepareStatement("INSERT INTO CONDITION_OCCURRENCE"
-							+ " (CONDITION_OCCURRENCE_ID, PERSON_ID, CONDITION_CONCEPT_ID, CONDITION_START_DATE, CONDITION_END_DATE, CONDITION_TYPE_CONCEPT_ID, ASSOCIATED_PROVIDER_ID, VISIT_OCCURRENCE_ID, CONDITION_SOURCE_VALUE) VALUES"
-							+ " (?,?,?,?,?,?,?,?,?)");
+							+ " (PERSON_ID, CONDITION_CONCEPT_ID, CONDITION_START_DATE, CONDITION_END_DATE, CONDITION_TYPE_CONCEPT_ID, ASSOCIATED_PROVIDER_ID, VISIT_OCCURRENCE_ID, CONDITION_SOURCE_VALUE) VALUES"
+							+ " (?,?,?,?,?,?,?,?)", Statement.RETURN_GENERATED_KEYS);
 			pstmtOMOPConditionF1 = connOMOP
 					.prepareStatement("INSERT INTO F_CONDITION_OCCURRENCE (CONDITION_OCCURRENCE_ID, FHIR_CONDITION_STATUS_CODE, FHIR_CONDITION_DISPLAY, CONDITION_SEVERITY_CONCEPT_ID) VALUES"
 							+ "(?, ?, ?, ?)");
 			pstmtOMOPCondition2 = connOMOP
 					.prepareStatement("INSERT INTO CONDITION_OCCURRENCE"
-							+ " (CONDITION_OCCURRENCE_ID, PERSON_ID, CONDITION_CONCEPT_ID, CONDITION_START_DATE, CONDITION_END_DATE, CONDITION_TYPE_CONCEPT_ID, ASSOCIATED_PROVIDER_ID, VISIT_OCCURRENCE_ID, CONDITION_SOURCE_VALUE) VALUES"
-							+ " (?,?,?,?,?,?,?,?,?)");
+							+ " (PERSON_ID, CONDITION_CONCEPT_ID, CONDITION_START_DATE, CONDITION_END_DATE, CONDITION_TYPE_CONCEPT_ID, ASSOCIATED_PROVIDER_ID, VISIT_OCCURRENCE_ID, CONDITION_SOURCE_VALUE) VALUES"
+							+ " (?,?,?,?,?,?,?,?)", Statement.RETURN_GENERATED_KEYS);
 			pstmtOMOPConditionF2 = connOMOP
 					.prepareStatement("INSERT INTO F_CONDITION_OCCURRENCE (CONDITION_OCCURRENCE_ID, FHIR_CONDITION_STATUS_CODE, FHIR_CONDITION_DISPLAY, CONDITION_SEVERITY_CONCEPT_ID) VALUES"
 							+ "(?, ?, ?, ?)");
 
-			rsOMOP = stmtOMOP
-					.executeQuery("SELECT VISIT_OCCURRENCE_ID FROM VISIT_OCCURRENCE ORDER BY VISIT_OCCURRENCE_ID DESC");
-			if (rsOMOP.next()) {
-				visit_occurrence_id = rsOMOP.getLong("VISIT_OCCURRENCE_ID");
-			}
+//			rsOMOP = stmtOMOP
+//					.executeQuery("SELECT VISIT_OCCURRENCE_ID FROM VISIT_OCCURRENCE ORDER BY VISIT_OCCURRENCE_ID DESC");
+//			if (rsOMOP.next()) {
+//				visit_occurrence_id = rsOMOP.getLong("VISIT_OCCURRENCE_ID");
+//			}
 
 			rsExact = stmtExact.executeQuery("SELECT * FROM ENCOUNTER");
 			while (rsExact.next()) {
@@ -544,12 +554,14 @@ public class DBMapMain {
 					if (rsOMOP.next()) {
 						omop_episode_id = rsOMOP.getLong("EPISODE_OF_CARE_ID");
 					} else {
-						rsOMOP = stmtOMOP
-								.executeQuery("SELECT EPISODE_OF_CARE_ID FROM EPISODE_OF_CARE ORDER BY EPISODE_OF_CARE_ID DESC");
-						if (rsOMOP.next()) {
-							omop_episode_id = rsOMOP
-									.getLong("EPISODE_OF_CARE_ID") + 1;
-						}
+//						rsOMOP = stmtOMOP
+//								.executeQuery("SELECT EPISODE_OF_CARE_ID FROM EPISODE_OF_CARE ORDER BY EPISODE_OF_CARE_ID DESC");
+//						if (rsOMOP.next()) {
+//							omop_episode_id = rsOMOP
+//									.getLong("EPISODE_OF_CARE_ID") + 1;
+//						} else {
+//							omop_episode_id = 1;
+//						}
 						create_episode = true;
 					}
 				}
@@ -571,28 +583,37 @@ public class DBMapMain {
 					person_id = rsOMOP.getLong("PERSON_ID");
 					if (create_episode) {
 						// Create Episode
-						pstmtOMOPEpisode.setLong(1, omop_episode_id);
-						pstmtOMOPEpisode.setLong(2, person_id);
-						pstmtOMOPEpisode.setString(3, episode_id);
+//						pstmtOMOPEpisode.setLong(1, omop_episode_id);
+						pstmtOMOPEpisode.setLong(1, person_id);
+						pstmtOMOPEpisode.setString(2, episode_id);
 						pstmtOMOPEpisode.executeUpdate();
+						
+						ResultSet tableKeys = pstmtOMOPEpisode.getGeneratedKeys();
+						tableKeys.next();
+						omop_episode_id = tableKeys.getInt(1);
 					}
-					visit_occurrence_id++;
-					pstmtOMOPVisit.setLong(1, visit_occurrence_id);
-					pstmtOMOPVisit.setLong(2, person_id);
+//					visit_occurrence_id++;
+//					pstmtOMOPVisit.setLong(1, visit_occurrence_id);
+					pstmtOMOPVisit.setLong(1, person_id);
+					pstmtOMOPVisit.setTimestamp(2, encounter_ts);
 					pstmtOMOPVisit.setTimestamp(3, encounter_ts);
-					pstmtOMOPVisit.setTimestamp(4, encounter_ts);
-					pstmtOMOPVisit.setLong(5, place_of_service_concept_id);
+					pstmtOMOPVisit.setLong(4, place_of_service_concept_id);
 					if (care_site_id > 0) {
-						pstmtOMOPVisit.setLong(6, care_site_id);
+						pstmtOMOPVisit.setLong(5, care_site_id);
 					} else {
-						pstmtOMOPVisit.setNull(6, Types.NULL);
+						pstmtOMOPVisit.setNull(5, Types.NULL);
 					}
-					pstmtOMOPVisit.setString(7, place_of_service_value);
+					pstmtOMOPVisit.setString(6, place_of_service_value);
+
+					pstmtOMOPVisit.executeUpdate();
+
+					ResultSet tableKeys = pstmtOMOPVisit.getGeneratedKeys();
+					tableKeys.next();
+					visit_occurrence_id = tableKeys.getInt(1);
 
 					System.out.println("Adding Encounter ("
 							+ visit_occurrence_id + ") at "
 							+ encounter_ts.toString());
-					pstmtOMOPVisit.executeUpdate();
 
 					// insert f_visit_occurrence if episode id exists
 					if (omop_episode_id > 0
@@ -620,13 +641,13 @@ public class DBMapMain {
 					String CC = rsExact.getString("CC");
 					if (CC != null && !CC.isEmpty()) {
 						// We have a new condition here. Add it.
-						ResultSet rsIndex = stmtOMOP
-								.executeQuery("SELECT CONDITION_OCCURRENCE_ID FROM CONDITION_OCCURRENCE ORDER BY CONDITION_OCCURRENCE_ID DESC");
 						long condition_occurrence_id = 0;
-						if (rsIndex.next()) {
-							condition_occurrence_id = rsIndex
-									.getLong("CONDITION_OCCURRENCE_ID");
-						}
+//						ResultSet rsIndex = stmtOMOP
+//								.executeQuery("SELECT CONDITION_OCCURRENCE_ID FROM CONDITION_OCCURRENCE ORDER BY CONDITION_OCCURRENCE_ID DESC");
+//						if (rsIndex.next()) {
+//							condition_occurrence_id = rsIndex
+//									.getLong("CONDITION_OCCURRENCE_ID");
+//						}
 
 						long condition_severity = 0;
 						String keywords = CC.toLowerCase();
@@ -884,18 +905,21 @@ public class DBMapMain {
 
 						if (condition_concept_ids.size() == 0) {
 							// add to condition occurence table.
-							pstmtOMOPCondition1.setLong(1,
-									++condition_occurrence_id);
-							pstmtOMOPCondition1.setLong(2, person_id);
-							pstmtOMOPCondition1.setLong(3, 0);
-							pstmtOMOPCondition1.setTimestamp(4, encounter_ts);
-							pstmtOMOPCondition1.setNull(5, Types.NULL);
-							pstmtOMOPCondition1.setLong(6, primary_condition);
-							pstmtOMOPCondition1.setLong(7, provider_id);
-							pstmtOMOPCondition1.setLong(8, visit_occurrence_id);
-							pstmtOMOPCondition1.setString(9,
-									place_of_service_value);
+//							pstmtOMOPCondition1.setLong(1,
+//									++condition_occurrence_id);
+							pstmtOMOPCondition1.setLong(1, person_id);
+							pstmtOMOPCondition1.setLong(2, 0);
+							pstmtOMOPCondition1.setTimestamp(3, encounter_ts);
+							pstmtOMOPCondition1.setNull(4, Types.NULL);
+							pstmtOMOPCondition1.setLong(5, primary_condition);
+							pstmtOMOPCondition1.setLong(6, provider_id);
+							pstmtOMOPCondition1.setLong(7, visit_occurrence_id);
+							pstmtOMOPCondition1.setString(8, place_of_service_value);
 							pstmtOMOPCondition1.executeUpdate();
+
+							ResultSet tableKeys1 = pstmtOMOPCondition1.getGeneratedKeys();
+							tableKeys1.next();
+							condition_occurrence_id = tableKeys1.getInt(1);
 
 							// condition status - this is a required field in
 							// the
@@ -917,22 +941,23 @@ public class DBMapMain {
 						} else {
 							for (int i = 0; i < condition_concept_ids.size(); i++) {
 								// add to condition occurence table.
-								pstmtOMOPCondition2.setLong(1,
-										++condition_occurrence_id);
-								pstmtOMOPCondition2.setLong(2, person_id);
-								pstmtOMOPCondition2.setLong(3,
+//								pstmtOMOPCondition2.setLong(1,
+//										++condition_occurrence_id);
+								pstmtOMOPCondition2.setLong(1, person_id);
+								pstmtOMOPCondition2.setLong(2,
 										condition_concept_ids.get(i));
-								pstmtOMOPCondition2.setTimestamp(4,
+								pstmtOMOPCondition2.setTimestamp(3,
 										encounter_ts);
-								pstmtOMOPCondition2.setNull(5, Types.NULL);
-								pstmtOMOPCondition2.setLong(6,
-										primary_condition);
-								pstmtOMOPCondition2.setLong(7, provider_id);
-								pstmtOMOPCondition2.setLong(8,
-										visit_occurrence_id);
-								pstmtOMOPCondition2.setString(9,
-										place_of_service_value);
+								pstmtOMOPCondition2.setNull(4, Types.NULL);
+								pstmtOMOPCondition2.setLong(5, primary_condition);
+								pstmtOMOPCondition2.setLong(6, provider_id);
+								pstmtOMOPCondition2.setLong(7, visit_occurrence_id);
+								pstmtOMOPCondition2.setString(8, place_of_service_value);
 								pstmtOMOPCondition2.executeUpdate();
+
+								ResultSet tableKeys2 = pstmtOMOPCondition2.getGeneratedKeys();
+								tableKeys2.next();
+								condition_occurrence_id = tableKeys2.getInt(1);
 
 								pstmtOMOPConditionF2.setLong(1,
 										condition_occurrence_id);
@@ -966,6 +991,7 @@ public class DBMapMain {
 		} catch (SQLException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+			System.exit(1);
 		} finally {
 			try {
 				connExact.close();
@@ -992,19 +1018,19 @@ public class DBMapMain {
 			stmtOMOP = connOMOP.createStatement();
 
 			long observation_id = 0;
-			rsOMOP = stmtOMOP
-					.executeQuery("SELECT OBSERVATION_ID FROM OBSERVATION ORDER BY OBSERVATION_ID DESC");
-			if (rsOMOP.next()) {
-				observation_id = rsOMOP.getLong("OBSERVATION_ID");
-			}
+//			rsOMOP = stmtOMOP
+//					.executeQuery("SELECT OBSERVATION_ID FROM OBSERVATION ORDER BY OBSERVATION_ID DESC");
+//			if (rsOMOP.next()) {
+//				observation_id = rsOMOP.getLong("OBSERVATION_ID");
+//			}
 
 			pstmtOMOP = connOMOP
 					.prepareStatement("INSERT INTO OBSERVATION"
-							+ " (OBSERVATION_ID, PERSON_ID, OBSERVATION_CONCEPT_ID, OBSERVATION_DATE, OBSERVATION_TIME, "
+							+ " (PERSON_ID, OBSERVATION_CONCEPT_ID, OBSERVATION_DATE, OBSERVATION_TIME, "
 							+ "VALUE_AS_NUMBER, VALUE_AS_STRING, VALUE_AS_CONCEPT_ID, UNIT_CONCEPT_ID, RANGE_LOW, RANGE_HIGH, "
 							+ "OBSERVATION_TYPE_CONCEPT_ID, ASSOCIATED_PROVIDER_ID, VISIT_OCCURRENCE_ID, OBSERVATION_SOURCE_VALUE, "
 							+ "UNITS_SOURCE_VALUE) VALUES"
-							+ " (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+							+ " (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", Statement.RETURN_GENERATED_KEYS);
 
 			rsExact = stmtExact.executeQuery("SELECT * FROM LAB_RESULTS");
 			while (rsExact.next()) {
@@ -1079,27 +1105,27 @@ public class DBMapMain {
 						}
 
 						// Now we are ready to add lab
-						pstmtOMOP.setLong(1, ++observation_id);
-						pstmtOMOP.setLong(2, person_id);
-						pstmtOMOP.setLong(3, lab_concept_id);
-						pstmtOMOP.setDate(4, new Date(obs_date.getTime()));
-						pstmtOMOP.setTimestamp(5, obs_date);
+//						pstmtOMOP.setLong(1, ++observation_id);
+						pstmtOMOP.setLong(1, person_id);
+						pstmtOMOP.setLong(2, lab_concept_id);
+						pstmtOMOP.setDate(3, new Date(obs_date.getTime()));
+						pstmtOMOP.setTimestamp(4, obs_date);
 						if (numeric_value != null && !numeric_value.isEmpty()) {
 							numeric_value = numeric_value.replace(",", "");
-							pstmtOMOP.setDouble(6,
+							pstmtOMOP.setDouble(5,
 									Double.parseDouble(numeric_value));
-							pstmtOMOP.setLong(12, observation_numeric_result);
+							pstmtOMOP.setLong(11, observation_numeric_result);
 						} else {
-							pstmtOMOP.setNull(6, Types.NULL);
-							pstmtOMOP.setLong(12, observation_text);
+							pstmtOMOP.setNull(5, Types.NULL);
+							pstmtOMOP.setLong(11, observation_text);
 						}
 						if (text_value != null && !text_value.isEmpty()) {
-							pstmtOMOP.setString(7, text_value);
+							pstmtOMOP.setString(6, text_value);
 						} else {
-							pstmtOMOP.setNull(7, Types.NULL);
+							pstmtOMOP.setNull(6, Types.NULL);
 						}
 
-						pstmtOMOP.setNull(8, Types.NULL);
+						pstmtOMOP.setNull(7, Types.NULL);
 
 						// unit concept id.
 						String unit = rsExact.getString("UNITS");
@@ -1135,13 +1161,13 @@ public class DBMapMain {
 						}
 
 						if (unit_concept_id == 0) {
-							pstmtOMOP.setNull(9, Types.NULL);
+							pstmtOMOP.setNull(8, Types.NULL);
 						} else {
-							pstmtOMOP.setLong(9, unit_concept_id);
+							pstmtOMOP.setLong(8, unit_concept_id);
 						}
 
+						pstmtOMOP.setNull(9, Types.NULL);
 						pstmtOMOP.setNull(10, Types.NULL);
-						pstmtOMOP.setNull(11, Types.NULL);
 
 						rsOMOP = stmtOMOP
 								.executeQuery("SELECT PROVIDER_ID FROM PROVIDER WHERE PROVIDER_SOURCE_VALUE='"
@@ -1152,22 +1178,26 @@ public class DBMapMain {
 							provider_id = rsOMOP.getLong("PROVIDER_ID");
 						}
 						if (provider_id == 0)
+							pstmtOMOP.setNull(12, Types.NULL);
+						else
+							pstmtOMOP.setLong(12, provider_id);
+						if (visit_occurrence_id == 0)
 							pstmtOMOP.setNull(13, Types.NULL);
 						else
-							pstmtOMOP.setLong(13, provider_id);
-						if (visit_occurrence_id == 0)
-							pstmtOMOP.setNull(14, Types.NULL);
-						else
-							pstmtOMOP.setLong(14, visit_occurrence_id);
+							pstmtOMOP.setLong(13, visit_occurrence_id);
 
-						pstmtOMOP.setString(15,
+						pstmtOMOP.setString(14,
 								rsExact.getString("RESULT_LOINC"));
-						pstmtOMOP.setString(16, unit);
+						pstmtOMOP.setString(15, unit);
 
-						System.out.println("Adding labs (" + observation_id
-								+ ")");
 						pstmtOMOP.executeUpdate();
 
+						ResultSet tableKeys = pstmtOMOP.getGeneratedKeys();
+						tableKeys.next();
+						observation_id = tableKeys.getInt(1);
+					
+						System.out.println("Adding labs (" + observation_id
+								+ ")");
 					} else {
 						System.out.println("Failed to add Lab for Member_ID:"
 								+ member_id
@@ -1218,16 +1248,16 @@ public class DBMapMain {
 			stmtOMOP = connOMOP.createStatement();
 			PreparedStatement pstmtOMOP = connOMOP
 					.prepareStatement("INSERT INTO OBSERVATION"
-							+ " (OBSERVATION_ID, PERSON_ID, OBSERVATION_CONCEPT_ID, OBSERVATION_DATE, OBSERVATION_TIME, VALUE_AS_NUMBER, VALUE_AS_STRING, VALUE_AS_CONCEPT_ID, UNIT_CONCEPT_ID, RANGE_LOW, RANGE_HIGH, OBSERVATION_TYPE_CONCEPT_ID, ASSOCIATED_PROVIDER_ID, OBSERVATION_SOURCE_VALUE, UNITS_SOURCE_VALUE, VISIT_OCCURRENCE_ID) VALUES"
-							+ " (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+							+ " (PERSON_ID, OBSERVATION_CONCEPT_ID, OBSERVATION_DATE, OBSERVATION_TIME, VALUE_AS_NUMBER, VALUE_AS_STRING, VALUE_AS_CONCEPT_ID, UNIT_CONCEPT_ID, RANGE_LOW, RANGE_HIGH, OBSERVATION_TYPE_CONCEPT_ID, ASSOCIATED_PROVIDER_ID, OBSERVATION_SOURCE_VALUE, UNITS_SOURCE_VALUE, VISIT_OCCURRENCE_ID) VALUES"
+							+ " (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", Statement.RETURN_GENERATED_KEYS);
+
+//			rsOMOP = stmtOMOP
+//					.executeQuery("SELECT OBSERVATION_ID FROM OBSERVATION ORDER BY OBSERVATION_ID DESC");
+//			if (rsOMOP.next()) {
+//				observation_id = rsOMOP.getLong("OBSERVATION_ID");
+//			}
 
 			rsExact = stmtExact.executeQuery(SQL_STATEMENT_FROM);
-			rsOMOP = stmtOMOP
-					.executeQuery("SELECT OBSERVATION_ID FROM OBSERVATION ORDER BY OBSERVATION_ID DESC");
-			if (rsOMOP.next()) {
-				observation_id = rsOMOP.getLong("OBSERVATION_ID");
-			}
-
 			while (rsExact.next()) {
 				String ExactMemberID = rsExact.getString("MEMBER_ID");
 
@@ -1300,40 +1330,45 @@ public class DBMapMain {
 								+ rsCheck.getString("TIME") + " exists");
 					} else {
 						// Insert the height.
-						observation_id++;
-						pstmtOMOP.setLong(1, observation_id);
-						pstmtOMOP.setLong(2, person_id);
-						pstmtOMOP.setLong(3, height_cid);
-						// pstmtOMOP.setDate(4, new
+//						observation_id++;
+//						pstmtOMOP.setLong(1, observation_id);
+						pstmtOMOP.setLong(1, person_id);
+						pstmtOMOP.setLong(2, height_cid);
+						// pstmtOMOP.setDate(3, new
 						// Date(df.parse(dfs).getTime()));
-						// pstmtOMOP.setDate(5, new
+						// pstmtOMOP.setDate(4, new
 						// Date(tf.parse(tfs).getTime()));
-						pstmtOMOP.setDate(4, new Date(obs_date.getTime()));
-						pstmtOMOP.setTimestamp(5, obs_date);
+						pstmtOMOP.setDate(3, new Date(obs_date.getTime()));
+						pstmtOMOP.setTimestamp(4, obs_date);
 						pstmtOMOP
-								.setDouble(6, Double.parseDouble(height_value));
+								.setDouble(5, Double.parseDouble(height_value));
+						pstmtOMOP.setNull(6, Types.NULL);
 						pstmtOMOP.setNull(7, Types.NULL);
-						pstmtOMOP.setNull(8, Types.NULL);
-						pstmtOMOP.setLong(9, height_unit_concept_id);
+						pstmtOMOP.setLong(8, height_unit_concept_id);
+						pstmtOMOP.setNull(9, Types.NULL);
 						pstmtOMOP.setNull(10, Types.NULL);
-						pstmtOMOP.setNull(11, Types.NULL);
-						pstmtOMOP.setLong(12, observation_numeric_result);
+						pstmtOMOP.setLong(11, observation_numeric_result);
 						if (provider_id != 0) {
-							pstmtOMOP.setLong(13, provider_id);
+							pstmtOMOP.setLong(12, provider_id);
 						} else {
-							pstmtOMOP.setNull(13, Types.NULL);
+							pstmtOMOP.setNull(12, Types.NULL);
 						}
-						pstmtOMOP.setString(14, "8302-2");
-						pstmtOMOP.setString(15, height_unit_string);
+						pstmtOMOP.setString(13, "8302-2");
+						pstmtOMOP.setString(14, height_unit_string);
 						if (visit_occurrence_id == 0) {
-							pstmtOMOP.setNull(16, Types.NULL);
+							pstmtOMOP.setNull(15, Types.NULL);
 						} else {
-							pstmtOMOP.setLong(16, visit_occurrence_id);
+							pstmtOMOP.setLong(15, visit_occurrence_id);
 						}
+
+						pstmtOMOP.executeUpdate();
+						
+						ResultSet tableKeys = pstmtOMOP.getGeneratedKeys();
+						tableKeys.next();
+						observation_id = tableKeys.getInt(1);
 
 						System.out.println("Adding Height (" + observation_id
 								+ ")");
-						pstmtOMOP.executeUpdate();
 					}
 
 					// Weight ************************
@@ -1373,36 +1408,41 @@ public class DBMapMain {
 								+ rsCheck.getString("TIME") + " exists");
 					} else {
 						// Insert the weight.
-						observation_id++;
-						pstmtOMOP.setLong(1, observation_id);
-						pstmtOMOP.setLong(2, person_id);
-						pstmtOMOP.setLong(3, weight_cid);
-						pstmtOMOP.setDate(4, new Date(obs_date.getTime()));
-						pstmtOMOP.setTimestamp(5, obs_date);
+//						observation_id++;
+//						pstmtOMOP.setLong(1, observation_id);
+						pstmtOMOP.setLong(1, person_id);
+						pstmtOMOP.setLong(2, weight_cid);
+						pstmtOMOP.setDate(3, new Date(obs_date.getTime()));
+						pstmtOMOP.setTimestamp(4, obs_date);
 						pstmtOMOP
-								.setDouble(6, Double.parseDouble(weight_value));
+								.setDouble(5, Double.parseDouble(weight_value));
+						pstmtOMOP.setNull(6, Types.NULL);
 						pstmtOMOP.setNull(7, Types.NULL);
-						pstmtOMOP.setNull(8, Types.NULL);
-						pstmtOMOP.setLong(9, weight_unit_concept_id);
+						pstmtOMOP.setLong(8, weight_unit_concept_id);
+						pstmtOMOP.setNull(9, Types.NULL);
 						pstmtOMOP.setNull(10, Types.NULL);
-						pstmtOMOP.setNull(11, Types.NULL);
-						pstmtOMOP.setLong(12, observation_numeric_result);
+						pstmtOMOP.setLong(11, observation_numeric_result);
 						if (provider_id != 0) {
-							pstmtOMOP.setLong(13, provider_id);
+							pstmtOMOP.setLong(12, provider_id);
 						} else {
-							pstmtOMOP.setNull(13, Types.NULL);
+							pstmtOMOP.setNull(12, Types.NULL);
 						}
-						pstmtOMOP.setString(14, "3141-9");
-						pstmtOMOP.setString(15, weight_unit_string);
+						pstmtOMOP.setString(13, "3141-9");
+						pstmtOMOP.setString(14, weight_unit_string);
 						if (visit_occurrence_id == 0) {
-							pstmtOMOP.setNull(16, Types.NULL);
+							pstmtOMOP.setNull(15, Types.NULL);
 						} else {
-							pstmtOMOP.setLong(16, visit_occurrence_id);
+							pstmtOMOP.setLong(15, visit_occurrence_id);
 						}
+
+						pstmtOMOP.executeUpdate();
+						
+						ResultSet tableKeys = pstmtOMOP.getGeneratedKeys();
+						tableKeys.next();
+						observation_id = tableKeys.getInt(1);
 
 						System.out.println("Adding Weight (" + observation_id
 								+ ")");
-						pstmtOMOP.executeUpdate();
 					}
 
 					// BMI **************************** (kg/m^2)
@@ -1429,35 +1469,40 @@ public class DBMapMain {
 									+ rsCheck.getString("TIME") + " exists");
 						} else {
 							// Insert the BMI.
-							observation_id++;
-							pstmtOMOP.setLong(1, observation_id);
-							pstmtOMOP.setLong(2, person_id);
-							pstmtOMOP.setLong(3, bmi_cid);
-							pstmtOMOP.setDate(4, new Date(obs_date.getTime()));
-							pstmtOMOP.setTimestamp(5, obs_date);
-							pstmtOMOP.setDouble(6, bmi);
+//							observation_id++;
+//							pstmtOMOP.setLong(1, observation_id);
+							pstmtOMOP.setLong(1, person_id);
+							pstmtOMOP.setLong(2, bmi_cid);
+							pstmtOMOP.setDate(3, new Date(obs_date.getTime()));
+							pstmtOMOP.setTimestamp(4, obs_date);
+							pstmtOMOP.setDouble(5, bmi);
+							pstmtOMOP.setNull(6, Types.NULL);
 							pstmtOMOP.setNull(7, Types.NULL);
-							pstmtOMOP.setNull(8, Types.NULL);
-							pstmtOMOP.setLong(9, bmi_unit_cid);
+							pstmtOMOP.setLong(8, bmi_unit_cid);
+							pstmtOMOP.setNull(9, Types.NULL);
 							pstmtOMOP.setNull(10, Types.NULL);
-							pstmtOMOP.setNull(11, Types.NULL);
-							pstmtOMOP.setLong(12, observation_numeric_result);
+							pstmtOMOP.setLong(11, observation_numeric_result);
 							if (provider_id != 0) {
-								pstmtOMOP.setLong(13, provider_id);
+								pstmtOMOP.setLong(12, provider_id);
 							} else {
-								pstmtOMOP.setNull(13, Types.NULL);
+								pstmtOMOP.setNull(12, Types.NULL);
 							}
-							pstmtOMOP.setString(14, "39156-5");
-							pstmtOMOP.setString(15, "kg/m2");
+							pstmtOMOP.setString(13, "39156-5");
+							pstmtOMOP.setString(14, "kg/m2");
 							if (visit_occurrence_id == 0) {
-								pstmtOMOP.setNull(16, Types.NULL);
+								pstmtOMOP.setNull(15, Types.NULL);
 							} else {
-								pstmtOMOP.setLong(16, visit_occurrence_id);
+								pstmtOMOP.setLong(15, visit_occurrence_id);
 							}
+
+							pstmtOMOP.executeUpdate();
+							
+							ResultSet tableKeys = pstmtOMOP.getGeneratedKeys();
+							tableKeys.next();
+							observation_id = tableKeys.getInt(1);
 
 							System.out.println("Adding BMI (" + observation_id
 									+ ")");
-							pstmtOMOP.executeUpdate();
 						}
 					}
 
@@ -1492,103 +1537,118 @@ public class DBMapMain {
 						long diastolic_ob_id;
 						
 						// Insert the BP.
-						observation_id++;
-						systolic_ob_id = observation_id;
-						pstmtOMOP.setLong(1, observation_id);
-						pstmtOMOP.setLong(2, person_id);
-						pstmtOMOP.setLong(3, systolic_BP_cid);
-						pstmtOMOP.setDate(4, new Date(obs_date.getTime()));
-						pstmtOMOP.setTimestamp(5, obs_date);
-						pstmtOMOP.setInt(6, Integer.parseInt(systolicBP_value));
+//						observation_id++;
+//						systolic_ob_id = observation_id;
+//						pstmtOMOP.setLong(1, observation_id);
+						pstmtOMOP.setLong(1, person_id);
+						pstmtOMOP.setLong(2, systolic_BP_cid);
+						pstmtOMOP.setDate(3, new Date(obs_date.getTime()));
+						pstmtOMOP.setTimestamp(4, obs_date);
+						pstmtOMOP.setInt(5, Integer.parseInt(systolicBP_value));
+						pstmtOMOP.setNull(6, Types.NULL);
 						pstmtOMOP.setNull(7, Types.NULL);
-						pstmtOMOP.setNull(8, Types.NULL);
-						pstmtOMOP.setLong(9, BP_unit_cid);
+						pstmtOMOP.setLong(8, BP_unit_cid);
+						pstmtOMOP.setNull(9, Types.NULL);
 						pstmtOMOP.setNull(10, Types.NULL);
-						pstmtOMOP.setNull(11, Types.NULL);
-						pstmtOMOP.setLong(12, observation_numeric_result);
+						pstmtOMOP.setLong(11, observation_numeric_result);
 						if (provider_id != 0) {
-							pstmtOMOP.setLong(13, provider_id);
+							pstmtOMOP.setLong(12, provider_id);
 						} else {
-							pstmtOMOP.setNull(13, Types.NULL);
+							pstmtOMOP.setNull(12, Types.NULL);
 						}
-						pstmtOMOP.setString(14, "8480-6");
-						pstmtOMOP.setString(15, "mm[Hg]");
+						pstmtOMOP.setString(13, "8480-6");
+						pstmtOMOP.setString(14, "mm[Hg]");
 						if (visit_occurrence_id == 0) {
-							pstmtOMOP.setNull(16, Types.NULL);
+							pstmtOMOP.setNull(15, Types.NULL);
 						} else {
-							pstmtOMOP.setLong(16, visit_occurrence_id);
+							pstmtOMOP.setLong(15, visit_occurrence_id);
 						}
 
+						pstmtOMOP.executeUpdate();
+						ResultSet tableKeys = pstmtOMOP.getGeneratedKeys();
+						tableKeys.next();
+						observation_id = tableKeys.getInt(1);
+						systolic_ob_id = observation_id;
+						
 						System.out.println("Adding SystolicBP ("
 								+ observation_id + ")");
-						pstmtOMOP.executeUpdate();
 
-						observation_id++;
-						
-						diastolic_ob_id = observation_id;
-						pstmtOMOP.setLong(1, observation_id);
-						pstmtOMOP.setLong(2, person_id);
-						pstmtOMOP.setLong(3, diastolic_BP_cid);
-						pstmtOMOP.setDate(4, new Date(obs_date.getTime()));
-						pstmtOMOP.setTimestamp(5, obs_date);
+//						observation_id++;					
+//						diastolic_ob_id = observation_id;
+//						pstmtOMOP.setLong(1, observation_id);
+						pstmtOMOP.setLong(1, person_id);
+						pstmtOMOP.setLong(2, diastolic_BP_cid);
+						pstmtOMOP.setDate(3, new Date(obs_date.getTime()));
+						pstmtOMOP.setTimestamp(4, obs_date);
 						pstmtOMOP
-								.setInt(6, Integer.parseInt(diastolicBP_value));
+								.setInt(5, Integer.parseInt(diastolicBP_value));
+						pstmtOMOP.setNull(6, Types.NULL);
 						pstmtOMOP.setNull(7, Types.NULL);
-						pstmtOMOP.setNull(8, Types.NULL);
-						pstmtOMOP.setLong(9, BP_unit_cid);
+						pstmtOMOP.setLong(8, BP_unit_cid);
+						pstmtOMOP.setNull(9, Types.NULL);
 						pstmtOMOP.setNull(10, Types.NULL);
-						pstmtOMOP.setNull(11, Types.NULL);
-						pstmtOMOP.setLong(12, observation_numeric_result);
+						pstmtOMOP.setLong(11, observation_numeric_result);
 						if (provider_id != 0) {
-							pstmtOMOP.setLong(13, provider_id);
+							pstmtOMOP.setLong(12, provider_id);
 						} else {
-							pstmtOMOP.setNull(13, Types.NULL);
+							pstmtOMOP.setNull(12, Types.NULL);
 						}
-						pstmtOMOP.setString(14, "8462-4");
-						pstmtOMOP.setString(15, "mm[Hg]");
+						pstmtOMOP.setString(13, "8462-4");
+						pstmtOMOP.setString(14, "mm[Hg]");
 						if (visit_occurrence_id == 0) {
-							pstmtOMOP.setNull(16, Types.NULL);
+							pstmtOMOP.setNull(15, Types.NULL);
 						} else {
-							pstmtOMOP.setLong(16, visit_occurrence_id);
+							pstmtOMOP.setLong(15, visit_occurrence_id);
 						}
 
+						pstmtOMOP.executeUpdate();
+						ResultSet tableKeys1 = pstmtOMOP.getGeneratedKeys();
+						tableKeys1.next();
+						observation_id = tableKeys1.getInt(1);
+						diastolic_ob_id = observation_id;
+						
 						System.out.println("Adding DiastolicBP ("
 								+ observation_id + ")");
-						pstmtOMOP.executeUpdate();
 
 						// Add group BP.
-						observation_id++;
-						pstmtOMOP.setLong(1, observation_id);
-						pstmtOMOP.setLong(2, person_id);
-						pstmtOMOP.setLong(3, systolic_diastolic_BP_cid);
-						pstmtOMOP.setDate(4, new Date(obs_date.getTime()));
-						pstmtOMOP.setTimestamp(5, obs_date);
-						pstmtOMOP.setNull(6, Types.NULL);
-						pstmtOMOP.setString(7, "Blood pressure "+systolicBP_value+"/"+diastolicBP_value+" mmHg");
-						pstmtOMOP.setNull(8, Types.NULL);
-						pstmtOMOP.setLong(9, BP_unit_cid);
+//						observation_id++;
+//						pstmtOMOP.setLong(1, observation_id);
+						pstmtOMOP.setLong(1, person_id);
+						pstmtOMOP.setLong(2, systolic_diastolic_BP_cid);
+						pstmtOMOP.setDate(3, new Date(obs_date.getTime()));
+						pstmtOMOP.setTimestamp(4, obs_date);
+						pstmtOMOP.setNull(5, Types.NULL);
+						pstmtOMOP.setString(6, "Blood pressure "+systolicBP_value+"/"+diastolicBP_value+" mmHg");
+						pstmtOMOP.setNull(7, Types.NULL);
+						pstmtOMOP.setLong(8, BP_unit_cid);
+						pstmtOMOP.setNull(9, Types.NULL);
 						pstmtOMOP.setNull(10, Types.NULL);
-						pstmtOMOP.setNull(11, Types.NULL);
-						pstmtOMOP.setLong(12, observation_text);
+						pstmtOMOP.setLong(11, observation_text);
 						if (provider_id != 0) {
-							pstmtOMOP.setLong(13, provider_id);
+							pstmtOMOP.setLong(12, provider_id);
 						} else {
-							pstmtOMOP.setNull(13, Types.NULL);
+							pstmtOMOP.setNull(12, Types.NULL);
 						}
 						// We put source of these two BP values here. This is
 						// component type. So, use COMP tag. Then put systolic and diastolic 
 						// observation IDs with comma separation
-						pstmtOMOP.setString(14, "COMP,"+systolic_ob_id+","+diastolic_ob_id);
-						pstmtOMOP.setString(15, "mm[Hg]");
+						pstmtOMOP.setString(13, "COMP,"+systolic_ob_id+","+diastolic_ob_id);
+						pstmtOMOP.setString(14, "mm[Hg]");
 						if (visit_occurrence_id == 0) {
-							pstmtOMOP.setNull(16, Types.NULL);
+							pstmtOMOP.setNull(15, Types.NULL);
 						} else {
-							pstmtOMOP.setLong(16, visit_occurrence_id);
+							pstmtOMOP.setLong(15, visit_occurrence_id);
 						}
 
+						pstmtOMOP.executeUpdate();
+						
+						ResultSet tableKeys2 = pstmtOMOP.getGeneratedKeys();
+						tableKeys2.next();
+						observation_id = tableKeys2.getInt(1);
+						
 						System.out.println("Adding GroupBP ("
 								+ observation_id + ")");
-						pstmtOMOP.executeUpdate();
+
 					}
 					
 					// Heart Rate (Pulse) ***************************
@@ -1614,35 +1674,40 @@ public class DBMapMain {
 								+ rsCheck.getString("TIME") + " exists");
 					} else {
 						// Insert the heart rate.
-						observation_id++;
-						pstmtOMOP.setLong(1, observation_id);
-						pstmtOMOP.setLong(2, person_id);
-						pstmtOMOP.setLong(3, heart_rate_cid);
-						pstmtOMOP.setDate(4, new Date(obs_date.getTime()));
-						pstmtOMOP.setTimestamp(5, obs_date);
-						pstmtOMOP.setInt(6, Integer.parseInt(heartrate_value));
+//						observation_id++;
+//						pstmtOMOP.setLong(1, observation_id);
+						pstmtOMOP.setLong(1, person_id);
+						pstmtOMOP.setLong(2, heart_rate_cid);
+						pstmtOMOP.setDate(3, new Date(obs_date.getTime()));
+						pstmtOMOP.setTimestamp(4, obs_date);
+						pstmtOMOP.setInt(5, Integer.parseInt(heartrate_value));
+						pstmtOMOP.setNull(6, Types.NULL);
 						pstmtOMOP.setNull(7, Types.NULL);
-						pstmtOMOP.setNull(8, Types.NULL);
-						pstmtOMOP.setLong(9, per_min_cid);
+						pstmtOMOP.setLong(8, per_min_cid);
+						pstmtOMOP.setNull(9, Types.NULL);
 						pstmtOMOP.setNull(10, Types.NULL);
-						pstmtOMOP.setNull(11, Types.NULL);
-						pstmtOMOP.setLong(12, observation_numeric_result);
+						pstmtOMOP.setLong(11, observation_numeric_result);
 						if (provider_id != 0) {
-							pstmtOMOP.setLong(13, provider_id);
+							pstmtOMOP.setLong(12, provider_id);
 						} else {
-							pstmtOMOP.setNull(13, Types.NULL);
+							pstmtOMOP.setNull(12, Types.NULL);
 						}
-						pstmtOMOP.setString(14, "8867-4");
-						pstmtOMOP.setString(15, "{beats}/min");
+						pstmtOMOP.setString(13, "8867-4");
+						pstmtOMOP.setString(14, "{beats}/min");
 						if (visit_occurrence_id == 0) {
-							pstmtOMOP.setNull(16, Types.NULL);
+							pstmtOMOP.setNull(15, Types.NULL);
 						} else {
-							pstmtOMOP.setLong(16, visit_occurrence_id);
+							pstmtOMOP.setLong(15, visit_occurrence_id);
 						}
+
+						pstmtOMOP.executeUpdate();
+
+						ResultSet tableKeys3 = pstmtOMOP.getGeneratedKeys();
+						tableKeys3.next();
+						observation_id = tableKeys3.getInt(1);
 
 						System.out.println("Adding Heart Rate ("
 								+ observation_id + ")");
-						pstmtOMOP.executeUpdate();
 					}
 
 					// Respiration Rate *********************************
@@ -1668,36 +1733,41 @@ public class DBMapMain {
 								+ rsCheck.getString("TIME") + " exists");
 					} else {
 						// Insert the respiration rate.
-						observation_id++;
-						pstmtOMOP.setLong(1, observation_id);
-						pstmtOMOP.setLong(2, person_id);
-						pstmtOMOP.setLong(3, respiration_rate_cid);
-						pstmtOMOP.setDate(4, new Date(obs_date.getTime()));
-						pstmtOMOP.setTimestamp(5, obs_date);
+//						observation_id++;
+//						pstmtOMOP.setLong(1, observation_id);
+						pstmtOMOP.setLong(1, person_id);
+						pstmtOMOP.setLong(2, respiration_rate_cid);
+						pstmtOMOP.setDate(3, new Date(obs_date.getTime()));
+						pstmtOMOP.setTimestamp(4, obs_date);
 						pstmtOMOP
-								.setInt(6, Integer.parseInt(respiration_value));
+								.setInt(5, Integer.parseInt(respiration_value));
+						pstmtOMOP.setNull(6, Types.NULL);
 						pstmtOMOP.setNull(7, Types.NULL);
-						pstmtOMOP.setNull(8, Types.NULL);
-						pstmtOMOP.setLong(9, per_min_cid);
+						pstmtOMOP.setLong(8, per_min_cid);
+						pstmtOMOP.setNull(9, Types.NULL);
 						pstmtOMOP.setNull(10, Types.NULL);
-						pstmtOMOP.setNull(11, Types.NULL);
-						pstmtOMOP.setLong(12, observation_numeric_result);
+						pstmtOMOP.setLong(11, observation_numeric_result);
 						if (provider_id != 0) {
-							pstmtOMOP.setLong(13, provider_id);
+							pstmtOMOP.setLong(12, provider_id);
 						} else {
-							pstmtOMOP.setNull(13, Types.NULL);
+							pstmtOMOP.setNull(12, Types.NULL);
 						}
-						pstmtOMOP.setString(14, "9279-1");
-						pstmtOMOP.setString(15, "{breaths}/min");
+						pstmtOMOP.setString(13, "9279-1");
+						pstmtOMOP.setString(14, "{breaths}/min");
 						if (visit_occurrence_id == 0) {
-							pstmtOMOP.setNull(16, Types.NULL);
+							pstmtOMOP.setNull(15, Types.NULL);
 						} else {
-							pstmtOMOP.setLong(16, visit_occurrence_id);
+							pstmtOMOP.setLong(15, visit_occurrence_id);
 						}
 
+						pstmtOMOP.executeUpdate();
+						
+						ResultSet tableKeys = pstmtOMOP.getGeneratedKeys();
+						tableKeys.next();
+						observation_id = tableKeys.getInt(1);
+						
 						System.out.println("Adding Respiration Rate ("
 								+ observation_id + ")");
-						pstmtOMOP.executeUpdate();
 					}
 
 					// Temperature ************************************
@@ -1736,36 +1806,40 @@ public class DBMapMain {
 								+ rsCheck.getString("TIME") + " exists");
 					} else {
 						// Insert the temperature.
-						observation_id++;
-						pstmtOMOP.setLong(1, observation_id);
-						pstmtOMOP.setLong(2, person_id);
-						pstmtOMOP.setLong(3, temp_cid);
-						pstmtOMOP.setDate(4, new Date(obs_date.getTime()));
-						pstmtOMOP.setTimestamp(5, obs_date);
-						pstmtOMOP.setDouble(6,
+//						observation_id++;
+//						pstmtOMOP.setLong(1, observation_id);
+						pstmtOMOP.setLong(1, person_id);
+						pstmtOMOP.setLong(2, temp_cid);
+						pstmtOMOP.setDate(3, new Date(obs_date.getTime()));
+						pstmtOMOP.setTimestamp(4, obs_date);
+						pstmtOMOP.setDouble(5,
 								Double.parseDouble(temperature_value));
+						pstmtOMOP.setNull(6, Types.NULL);
 						pstmtOMOP.setNull(7, Types.NULL);
-						pstmtOMOP.setNull(8, Types.NULL);
-						pstmtOMOP.setLong(9, temperature_unit_concept_id);
+						pstmtOMOP.setLong(8, temperature_unit_concept_id);
+						pstmtOMOP.setNull(9, Types.NULL);
 						pstmtOMOP.setNull(10, Types.NULL);
-						pstmtOMOP.setNull(11, Types.NULL);
-						pstmtOMOP.setLong(12, observation_numeric_result);
+						pstmtOMOP.setLong(11, observation_numeric_result);
 						if (provider_id != 0) {
-							pstmtOMOP.setLong(13, provider_id);
+							pstmtOMOP.setLong(12, provider_id);
 						} else {
-							pstmtOMOP.setNull(13, Types.NULL);
+							pstmtOMOP.setNull(12, Types.NULL);
 						}
-						pstmtOMOP.setString(14, "8310-5");
-						pstmtOMOP.setString(15, temperature_unit_string);
+						pstmtOMOP.setString(13, "8310-5");
+						pstmtOMOP.setString(14, temperature_unit_string);
 						if (visit_occurrence_id == 0) {
-							pstmtOMOP.setNull(16, Types.NULL);
+							pstmtOMOP.setNull(15, Types.NULL);
 						} else {
-							pstmtOMOP.setLong(16, visit_occurrence_id);
+							pstmtOMOP.setLong(15, visit_occurrence_id);
 						}
 
+						pstmtOMOP.executeUpdate();
+						ResultSet tableKeys = pstmtOMOP.getGeneratedKeys();
+						tableKeys.next();
+						observation_id = tableKeys.getInt(1);
+						
 						System.out.println("Adding Temperature ("
 								+ observation_id + ")");
-						pstmtOMOP.executeUpdate();
 					}
 
 				} else {
@@ -1802,31 +1876,31 @@ public class DBMapMain {
 		setup_database();
 
 		String SQL_STATEMENT_FROM = "SELECT * FROM PROBLEM";
-		String SQL_STATEMENT_C_O_ID = "SELECT CONDITION_OCCURRENCE_ID FROM CONDITION_OCCURRENCE ORDER BY CONDITION_OCCURRENCE_ID DESC";
+//		String SQL_STATEMENT_C_O_ID = "SELECT CONDITION_OCCURRENCE_ID FROM CONDITION_OCCURRENCE ORDER BY CONDITION_OCCURRENCE_ID DESC";
 
 		String SQL_STATEMENT_TO_CONDITION_OCCUR = "INSERT INTO CONDITION_OCCURRENCE"
-				+ " (CONDITION_OCCURRENCE_ID, PERSON_ID, CONDITION_CONCEPT_ID, CONDITION_START_DATE, CONDITION_END_DATE, CONDITION_TYPE_CONCEPT_ID, CONDITION_SOURCE_VALUE) VALUES"
-				+ " (?,?,?,?,?,?,?)";
+				+ " (PERSON_ID, CONDITION_CONCEPT_ID, CONDITION_START_DATE, CONDITION_END_DATE, CONDITION_TYPE_CONCEPT_ID, CONDITION_SOURCE_VALUE) VALUES"
+				+ " (?,?,?,?,?,?)";
 		String SQL_STATEMENT_ICD9toSCT_MAPPING = "SELECT ICD_CODE, ICD_NAME, SNOMED_CID, SNOMED_FSN FROM ICD9toSCT WHERE";
 
 		long condition_occurrence_id = 0;
 		try {
 			stmtOMOP = connOMOP.createStatement();
 			stmtExact = connExact.createStatement();
-			rsExact = stmtExact.executeQuery(SQL_STATEMENT_FROM);
 
 			PreparedStatement pstmtOMOP = connOMOP
-					.prepareStatement(SQL_STATEMENT_TO_CONDITION_OCCUR);
+					.prepareStatement(SQL_STATEMENT_TO_CONDITION_OCCUR, Statement.RETURN_GENERATED_KEYS);
 			PreparedStatement pstmtOMOPF = connOMOP
 					.prepareStatement("INSERT INTO F_CONDITION_OCCURRENCE (CONDITION_OCCURRENCE_ID, FHIR_CONDITION_DISPLAY) VALUES (?, ?)");
 
-			rsOMOP = stmtOMOP.executeQuery(SQL_STATEMENT_C_O_ID);
-			if (rsOMOP.next()) {
-				condition_occurrence_id = rsOMOP
-						.getLong("CONDITION_OCCURRENCE_ID");
-			}
-			rsOMOP.close();
+//			rsOMOP = stmtOMOP.executeQuery(SQL_STATEMENT_C_O_ID);
+//			if (rsOMOP.next()) {
+//				condition_occurrence_id = rsOMOP
+//						.getLong("CONDITION_OCCURRENCE_ID");
+//			}
+//			rsOMOP.close();
 
+			rsExact = stmtExact.executeQuery(SQL_STATEMENT_FROM);
 			while (rsExact.next()) {
 				// Get MEMBER_ID to get person_id.
 				long person_id = 0;
@@ -1940,28 +2014,31 @@ public class DBMapMain {
 
 							// Now we have everything. Create a condition
 							// occurrence entry.
-							condition_occurrence_id++;
-							pstmtOMOP.setLong(1, condition_occurrence_id);
-							pstmtOMOP.setLong(2, person_id);
-							pstmtOMOP.setLong(3, concept_id);
+//							condition_occurrence_id++;
+//							pstmtOMOP.setLong(1, condition_occurrence_id);
+							pstmtOMOP.setLong(1, person_id);
+							pstmtOMOP.setLong(2, concept_id);
 
-							pstmtOMOP.setDate(4, startDate);
+							pstmtOMOP.setDate(3, startDate);
 
 							try {
 								Date endDate = rsExact
 										.getDate("RESOLUTION_DATE");
 								if (endDate.after(startDate)) {
-									pstmtOMOP.setDate(5, endDate);
+									pstmtOMOP.setDate(4, endDate);
 								}
 							} catch (SQLException e) {
-								pstmtOMOP.setDate(5, null);
+								pstmtOMOP.setDate(4, null);
 							}
 
-							pstmtOMOP.setLong(6, EHR_prob_list_entry);
-							pstmtOMOP.setString(7, ICDcode);
+							pstmtOMOP.setLong(5, EHR_prob_list_entry);
+							pstmtOMOP.setString(6, ICDcode);
 
 							pstmtOMOP.executeUpdate();
-
+							ResultSet tableKeys = pstmtOMOP.getGeneratedKeys();
+							tableKeys.next();
+							condition_occurrence_id = tableKeys.getInt(1);
+							
 							pstmtOMOPF.setLong(1, condition_occurrence_id);
 							pstmtOMOPF.setString(2, prob_descript);
 							pstmtOMOPF.executeUpdate();
@@ -2026,38 +2103,38 @@ public class DBMapMain {
 		// Person Information.
 //		String SQL_STATEMENT_FROM = "SELECT * FROM ENROLLMENT";
 		String SQL_STATEMENT_TO_PERSON = "INSERT INTO PERSON"
-				+ " (PERSON_ID, GENDER_CONCEPT_ID, YEAR_OF_BIRTH, MONTH_OF_BIRTH, DAY_OF_BIRTH, RACE_CONCEPT_ID, LOCATION_ID, PERSON_SOURCE_VALUE, GENDER_SOURCE_VALUE, RACE_SOURCE_VALUE, ETHNICITY_SOURCE_VALUE) VALUES "
-				+ " (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+				+ " (GENDER_CONCEPT_ID, YEAR_OF_BIRTH, MONTH_OF_BIRTH, DAY_OF_BIRTH, RACE_CONCEPT_ID, LOCATION_ID, PERSON_SOURCE_VALUE, GENDER_SOURCE_VALUE, RACE_SOURCE_VALUE, ETHNICITY_SOURCE_VALUE) VALUES "
+				+ " (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 		String SQL_STATEMENT_TO_F_PERSON = "INSERT INTO F_PERSON"
 				+ " (PERSON_ID, FAMILY_NAME, GIVEN1_NAME, GIVEN2_NAME, PREFIX_NAME, SSN, MARITALSTATUS_CONCEPT_ID) VALUES "
 				+ " (?, ?, ?, ?, ?, ?, ?)";
-		String SQL_STATEMENT_PID = "SELECT PERSON_ID FROM PERSON ORDER BY PERSON_ID DESC";
+//		String SQL_STATEMENT_PID = "SELECT PERSON_ID FROM PERSON ORDER BY PERSON_ID DESC";
 		String SQL_STATEMENT_LOCATION = "INSERT INTO LOCATION"
-				+ " (LOCATION_ID, ADDRESS_1, ADDRESS_2, CITY, STATE, ZIP, LOCATION_SOURCE_VALUE) VALUES "
-				+ " (?, ? ,?, ?, ?, ?, ?)";
+				+ " (ADDRESS_1, ADDRESS_2, CITY, STATE, ZIP, LOCATION_SOURCE_VALUE) VALUES "
+				+ " (? ,?, ?, ?, ?, ?)";
 		String SQL_STATEMENT_F_LOCATION = "INSERT INTO F_LOCATION (LOCATION_ID) VALUES (?)";
-		String SQL_STATEMENT_LOCATIONID = "SELECT LOCATION_ID FROM LOCATION ORDER BY LOCATION_ID DESC";
+//		String SQL_STATEMENT_LOCATIONID = "SELECT LOCATION_ID FROM LOCATION ORDER BY LOCATION_ID DESC";
 
 		long person_id = 0;
 		long location_id = 0;
 		try {
 			stmtOMOP = connOMOP.createStatement();
-			rsOMOP = stmtOMOP.executeQuery(SQL_STATEMENT_PID);
-			if (rsOMOP.next()) {
-				person_id = rsOMOP.getLong("PERSON_ID");
-			}
+//			rsOMOP = stmtOMOP.executeQuery(SQL_STATEMENT_PID);
+//			if (rsOMOP.next()) {
+//				person_id = rsOMOP.getLong("PERSON_ID");
+//			}
 
-			rsOMOP = stmtOMOP.executeQuery(SQL_STATEMENT_LOCATIONID);
-			if (rsOMOP.next()) {
-				location_id = rsOMOP.getLong("LOCATION_ID");
-			}
+//			rsOMOP = stmtOMOP.executeQuery(SQL_STATEMENT_LOCATIONID);
+//			if (rsOMOP.next()) {
+//				location_id = rsOMOP.getLong("LOCATION_ID");
+//			}
 
 			PreparedStatement pstmt_person = connOMOP
-					.prepareStatement(SQL_STATEMENT_TO_PERSON);
+					.prepareStatement(SQL_STATEMENT_TO_PERSON, Statement.RETURN_GENERATED_KEYS);
 			PreparedStatement pstmt_f_person = connOMOP
 					.prepareStatement(SQL_STATEMENT_TO_F_PERSON);
 			PreparedStatement pstmt_location = connOMOP
-					.prepareStatement(SQL_STATEMENT_LOCATION);
+					.prepareStatement(SQL_STATEMENT_LOCATION, Statement.RETURN_GENERATED_KEYS);
 			PreparedStatement pstmt_f_location = connOMOP
 					.prepareStatement(SQL_STATEMENT_F_LOCATION);
 
@@ -2076,32 +2153,32 @@ public class DBMapMain {
 					continue;
 				}
 
-				person_id += 1;
+//				person_id += 1;
 				// location_id += 1;
 
-				pstmt_person.setLong(1, person_id);
+//				pstmt_person.setLong(1, person_id);
 				if (rsExact.getString("Gender").equalsIgnoreCase("male")) {
-					pstmt_person.setLong(2, male_gender);
+					pstmt_person.setLong(1, male_gender);
 				} else {
-					pstmt_person.setLong(2, female_gender);
+					pstmt_person.setLong(1, female_gender);
 				}
 				String DOB = rsExact.getString("DOB");
 				String DOBs[] = DOB.split("\\-");
-				pstmt_person.setInt(3, Integer.parseInt(DOBs[0]));
-				pstmt_person.setInt(4, Integer.parseInt(DOBs[1]));
-				pstmt_person.setInt(5, Integer.parseInt(DOBs[2]));
+				pstmt_person.setInt(2, Integer.parseInt(DOBs[0]));
+				pstmt_person.setInt(3, Integer.parseInt(DOBs[1]));
+				pstmt_person.setInt(4, Integer.parseInt(DOBs[2]));
 				if (rsExact.getString("Race").equalsIgnoreCase("White")) {
-					pstmt_person.setLong(6, white);
+					pstmt_person.setLong(5, white);
 				} else if (rsExact.getString("Race").equalsIgnoreCase("Black")) {
-					pstmt_person.setLong(6, black);
+					pstmt_person.setLong(5, black);
 				} else if (rsExact.getString("Race").equalsIgnoreCase(
 						"Native American")) {
-					pstmt_person.setLong(6, amrican_indian_alaska_native);
+					pstmt_person.setLong(5, amrican_indian_alaska_native);
 				} else if (rsExact.getString("Race").equalsIgnoreCase("Asian")) {
-					pstmt_person.setLong(6, asian);
+					pstmt_person.setLong(5, asian);
 				} else if (rsExact.getString("Race").equalsIgnoreCase(
 						"Asian Indian")) {
-					pstmt_person.setLong(6, asian);
+					pstmt_person.setLong(5, asian);
 				}
 
 				// see if we have this address.
@@ -2121,26 +2198,37 @@ public class DBMapMain {
 				if (rsOMOP.next()) {
 					actual_location_id = rsOMOP.getLong("LOCATION_ID");
 				} else {
-					location_id += 1;
-					actual_location_id = location_id;
-					pstmt_location.setLong(1, location_id);
-					pstmt_location.setString(2, address1);
-					pstmt_location.setString(3, address2);
-					pstmt_location.setString(4, city);
-					pstmt_location.setString(5, state);
-					pstmt_location.setString(6, zip);
-					pstmt_location.setString(7, ExactMemberID);
+//					location_id += 1;
+//					actual_location_id = location_id;
+//					pstmt_location.setLong(1, location_id);
+					pstmt_location.setString(1, address1);
+					pstmt_location.setString(2, address2);
+					pstmt_location.setString(3, city);
+					pstmt_location.setString(4, state);
+					pstmt_location.setString(5, zip);
+					pstmt_location.setString(6, ExactMemberID);
+					
 					pstmt_location.executeUpdate();
+					ResultSet tableKeys = pstmt_location.getGeneratedKeys();
+					tableKeys.next();
+					location_id = tableKeys.getInt(1);
 					
 					pstmt_f_location.setLong(1, location_id);
 					pstmt_f_location.executeUpdate();
+					
+					actual_location_id = location_id;
 				}
 
-				pstmt_person.setLong(7, actual_location_id);
+				pstmt_person.setLong(6, actual_location_id);
+				pstmt_person.setString(7, ExactMemberID);
 				pstmt_person.setString(8, ExactMemberID);
 				pstmt_person.setString(9, ExactMemberID);
 				pstmt_person.setString(10, ExactMemberID);
-				pstmt_person.setString(11, ExactMemberID);
+				pstmt_person.executeUpdate();
+				
+				ResultSet tableKeys = pstmt_person.getGeneratedKeys();
+				tableKeys.next();
+				person_id = tableKeys.getInt(1);
 
 				pstmt_f_person.setLong(1, person_id);
 				pstmt_f_person.setString(2, rsExact.getString("Name_Last"));
@@ -2168,7 +2256,6 @@ public class DBMapMain {
 						.equalsIgnoreCase("Legally Separated")) {
 					pstmt_f_person.setLong(7, separated);
 				}
-				pstmt_person.executeUpdate();
 				pstmt_f_person.executeUpdate();
 
 				System.out.println(person_id + " are written to FHIR OMOP");
@@ -2222,18 +2309,18 @@ public class DBMapMain {
 			stmtOMOP = connOMOP.createStatement();
 
 			// Find next drug_exposure_id.
-			rsOMOP = stmtOMOP
-					.executeQuery("SELECT DRUG_EXPOSURE_ID FROM DRUG_EXPOSURE ORDER BY DRUG_EXPOSURE_ID DESC");
-			if (rsOMOP.next()) {
-				drug_exposure_id = rsOMOP.getLong("DRUG_EXPOSURE_ID");
-			}
+//			rsOMOP = stmtOMOP
+//					.executeQuery("SELECT DRUG_EXPOSURE_ID FROM DRUG_EXPOSURE ORDER BY DRUG_EXPOSURE_ID DESC");
+//			if (rsOMOP.next()) {
+//				drug_exposure_id = rsOMOP.getLong("DRUG_EXPOSURE_ID");
+//			}
 
 			pstmtOMOP = connOMOP
-					.prepareStatement("INSERT INTO DRUG_EXPOSURE (DRUG_EXPOSURE_ID, PERSON_ID, "
+					.prepareStatement("INSERT INTO DRUG_EXPOSURE (PERSON_ID, "
 							+ "DRUG_CONCEPT_ID, DRUG_EXPOSURE_START_DATE, DRUG_EXPOSURE_END_DATE, DRUG_TYPE_CONCEPT_ID, "
 							+ "STOP_REASON, REFILLS, QUANTITY, DAYS_SUPPLY, SIG, PRESCRIBING_PROVIDER_ID, VISIT_OCCURRENCE_ID, "
 							+ "RELEVANT_CONDITION_CONCEPT_ID, DRUG_SOURCE_VALUE) VALUES "
-							+ "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+							+ "(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", Statement.RETURN_GENERATED_KEYS);
 
 			pstmtOMOPF = connOMOP
 					.prepareStatement("INSERT INTO F_DRUG_EXPOSURE (DRUG_EXPOSURE_ID, DOSE, UNIT) VALUES "
@@ -2368,29 +2455,34 @@ public class DBMapMain {
 				String sig = rsExact.getString("SIG");
 
 				// Now add MedicationPrescription
-				pstmtOMOP.setLong(1, ++drug_exposure_id);
-				pstmtOMOP.setLong(2, person_id);
-				pstmtOMOP.setLong(3, drug_concept_id);
-				pstmtOMOP.setTimestamp(4, drug_order_ts);
-				pstmtOMOP.setNull(5, Types.NULL);
-				pstmtOMOP.setLong(6, prescription_written_code);
-				pstmtOMOP.setNull(7, Types.NULL);
-				pstmtOMOP.setInt(8, refills);
-				pstmtOMOP.setInt(9, Qty);
-				pstmtOMOP.setNull(10, Types.NULL);
-				pstmtOMOP.setString(11, sig);
+//				pstmtOMOP.setLong(1, ++drug_exposure_id);
+				pstmtOMOP.setLong(1, person_id);
+				pstmtOMOP.setLong(2, drug_concept_id);
+				pstmtOMOP.setTimestamp(3, drug_order_ts);
+				pstmtOMOP.setNull(4, Types.NULL);
+				pstmtOMOP.setLong(5, prescription_written_code);
+				pstmtOMOP.setNull(6, Types.NULL);
+				pstmtOMOP.setInt(7, refills);
+				pstmtOMOP.setInt(8, Qty);
+				pstmtOMOP.setNull(9, Types.NULL);
+				pstmtOMOP.setString(10, sig);
 				if (provider_id == 0) {
-					pstmtOMOP.setNull(12, Types.NULL);
+					pstmtOMOP.setNull(11, Types.NULL);
 				} else {
-					pstmtOMOP.setLong(12, provider_id);
+					pstmtOMOP.setLong(11, provider_id);
 				}
-				pstmtOMOP.setLong(13, visit_occurrence_id);
-				pstmtOMOP.setNull(14, Types.NULL);
-				pstmtOMOP.setString(15, NDC_code);
+				pstmtOMOP.setLong(12, visit_occurrence_id);
+				pstmtOMOP.setNull(13, Types.NULL);
+				pstmtOMOP.setString(14, NDC_code);
 
+				pstmtOMOP.executeUpdate();
+
+				ResultSet tableKeys = pstmtOMOP.getGeneratedKeys();
+				tableKeys.next();
+				drug_exposure_id = tableKeys.getInt(1);
+				
 				System.out.println("Adding MedicationPrescription ["
 						+ drug_exposure_id + "]");
-				pstmtOMOP.executeUpdate();
 
 				pstmtOMOPF.setLong(1, drug_exposure_id);
 				pstmtOMOPF.setString(2, rsExact.getString("DOSE"));
@@ -2440,18 +2532,18 @@ public class DBMapMain {
 			stmtOMOP = connOMOP.createStatement();
 
 			// Find next drug_exposure_id.
-			rsOMOP = stmtOMOP
-					.executeQuery("SELECT DRUG_EXPOSURE_ID FROM DRUG_EXPOSURE ORDER BY DRUG_EXPOSURE_ID DESC");
-			if (rsOMOP.next()) {
-				drug_exposure_id = rsOMOP.getLong("DRUG_EXPOSURE_ID");
-			}
+//			rsOMOP = stmtOMOP
+//					.executeQuery("SELECT DRUG_EXPOSURE_ID FROM DRUG_EXPOSURE ORDER BY DRUG_EXPOSURE_ID DESC");
+//			if (rsOMOP.next()) {
+//				drug_exposure_id = rsOMOP.getLong("DRUG_EXPOSURE_ID");
+//			}
 
 			pstmtOMOP = connOMOP
-					.prepareStatement("INSERT INTO DRUG_EXPOSURE (DRUG_EXPOSURE_ID, PERSON_ID, "
+					.prepareStatement("INSERT INTO DRUG_EXPOSURE (PERSON_ID, "
 							+ "DRUG_CONCEPT_ID, DRUG_EXPOSURE_START_DATE, DRUG_EXPOSURE_END_DATE, DRUG_TYPE_CONCEPT_ID, "
 							+ "STOP_REASON, REFILLS, QUANTITY, DAYS_SUPPLY, SIG, PRESCRIBING_PROVIDER_ID, VISIT_OCCURRENCE_ID, "
 							+ "RELEVANT_CONDITION_CONCEPT_ID, DRUG_SOURCE_VALUE) VALUES "
-							+ "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+							+ "(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", Statement.RETURN_GENERATED_KEYS);
 
 			pstmtOMOPF = connOMOP
 					.prepareStatement("INSERT INTO F_DRUG_EXPOSURE (DRUG_EXPOSURE_ID, DOSE, UNIT) VALUES "
@@ -2599,29 +2691,33 @@ public class DBMapMain {
 				int DaysSupply = rsExact.getInt("DAYS_OF_SUPPLY");
 
 				// Now add MedicationDispense
-				pstmtOMOP.setLong(1, ++drug_exposure_id);
-				pstmtOMOP.setLong(2, person_id);
-				pstmtOMOP.setLong(3, drug_concept_id);
-				pstmtOMOP.setTimestamp(4, drug_dispense_ts);
-				pstmtOMOP.setNull(5, Types.NULL);
-				pstmtOMOP.setLong(6, prescription_dispensed_code);
-				pstmtOMOP.setNull(7, Types.NULL);
-				pstmtOMOP.setNull(8, Types.NULL); // Refills
-				pstmtOMOP.setInt(9, Qty);
-				pstmtOMOP.setInt(10, DaysSupply);
-				pstmtOMOP.setString(11, sig);
+//				pstmtOMOP.setLong(1, ++drug_exposure_id);
+				pstmtOMOP.setLong(1, person_id);
+				pstmtOMOP.setLong(2, drug_concept_id);
+				pstmtOMOP.setTimestamp(3, drug_dispense_ts);
+				pstmtOMOP.setNull(4, Types.NULL);
+				pstmtOMOP.setLong(5, prescription_dispensed_code);
+				pstmtOMOP.setNull(6, Types.NULL);
+				pstmtOMOP.setNull(7, Types.NULL); // Refills
+				pstmtOMOP.setInt(8, Qty);
+				pstmtOMOP.setInt(9, DaysSupply);
+				pstmtOMOP.setString(10, sig);
 				if (provider_id == 0) {
-					pstmtOMOP.setNull(12, Types.NULL);
+					pstmtOMOP.setNull(11, Types.NULL);
 				} else {
-					pstmtOMOP.setLong(12, provider_id);
+					pstmtOMOP.setLong(11, provider_id);
 				}
-				pstmtOMOP.setLong(13, visit_occurrence_id);
-				pstmtOMOP.setNull(14, Types.NULL);
-				pstmtOMOP.setString(15, NDC_code);
+				pstmtOMOP.setLong(12, visit_occurrence_id);
+				pstmtOMOP.setNull(13, Types.NULL);
+				pstmtOMOP.setString(14, NDC_code);
 
+				pstmtOMOP.executeUpdate();
+				ResultSet tableKeys = pstmtOMOP.getGeneratedKeys();
+				tableKeys.next();
+				drug_exposure_id = tableKeys.getInt(1);
+				
 				System.out.println("Adding MedicationDispense ["
 						+ drug_exposure_id + "]");
-				pstmtOMOP.executeUpdate();
 
 				pstmtOMOPF.setLong(1, drug_exposure_id);
 				pstmtOMOPF.setString(2, rsExact.getString("DOSE"));
@@ -2663,13 +2759,13 @@ public class DBMapMain {
 			stmtOMOP1 = connOMOP.createStatement();
 			
 			long allergy_intolerance_reactions_id=0;
-			rsOMOP = stmtOMOP.executeQuery("SELECT ALLERGY_INTOLERANCE_REACTIONS_ID FROM ALLERGY_INTOLERANCE_REACTIONS ORDER BY ALLERGY_INTOLERANCE_REACTIONS_ID DESC");
-			if (rsOMOP.next()) {
-				allergy_intolerance_reactions_id = rsOMOP.getLong("ALLERGY_INTOLERANCE_REACTIONS_ID");
-			}
+//			rsOMOP = stmtOMOP.executeQuery("SELECT ALLERGY_INTOLERANCE_REACTIONS_ID FROM ALLERGY_INTOLERANCE_REACTIONS ORDER BY ALLERGY_INTOLERANCE_REACTIONS_ID DESC");
+//			if (rsOMOP.next()) {
+//				allergy_intolerance_reactions_id = rsOMOP.getLong("ALLERGY_INTOLERANCE_REACTIONS_ID");
+//			}
 			rsOMOP = stmtOMOP.executeQuery("SELECT ALLERGY_INTOLERANCE_ID, REACTION_DESCRIPTION FROM ALLERGY_INTOLERANCE");
-			PreparedStatement pstatementOMOP = connOMOP.prepareStatement("INSERT INTO ALLERGY_INTOLERANCE_REACTIONS (ALLERGY_INTOLERANCE_REACTIONS_ID, ALLERGY_INTOLERANCE_ID, REACTION_CONCEPT_ID) VALUES "
-					+ "(?,?,?)");
+			PreparedStatement pstatementOMOP = connOMOP.prepareStatement("INSERT INTO ALLERGY_INTOLERANCE_REACTIONS (ALLERGY_INTOLERANCE_ID, REACTION_CONCEPT_ID) VALUES "
+					+ "(?,?)", Statement.RETURN_GENERATED_KEYS);
 
 			List<Long> reaction_concept_ids = new ArrayList<Long>();
 			while (rsOMOP.next()) {
@@ -2741,11 +2837,15 @@ public class DBMapMain {
 							System.out.println("Allergy reaction entry ["+allergy_intolerance_reactions_id+"] exists");
 							continue;
 						} else {
-							allergy_intolerance_reactions_id++;
-							pstatementOMOP.setLong(1, allergy_intolerance_reactions_id);
-							pstatementOMOP.setLong(2, allergy_intolerance_id);
-							pstatementOMOP.setLong(3, reaction_concept_id);
+//							allergy_intolerance_reactions_id++;
+//							pstatementOMOP.setLong(1, allergy_intolerance_reactions_id);
+							pstatementOMOP.setLong(1, allergy_intolerance_id);
+							pstatementOMOP.setLong(2, reaction_concept_id);
 							pstatementOMOP.executeUpdate();
+							
+							ResultSet tableKeys = pstatementOMOP.getGeneratedKeys();
+							tableKeys.next();
+							allergy_intolerance_id = tableKeys.getInt(1);
 							System.out.println("New Reaction["+allergy_intolerance_id+"] is added to AllergyIntolerance["+allergy_intolerance_id+"]");
 						}
 					}
@@ -2789,16 +2889,16 @@ public class DBMapMain {
 			stmtOMOP = connOMOP.createStatement();
 
 			long allergy_intolerance_id = 0;
-			rsOMOP = stmtOMOP
-					.executeQuery("SELECT ALLERGY_INTOLERANCE_ID FROM ALLERGY_INTOLERANCE ORDER BY ALLERGY_INTOLERANCE_ID DESC");
-			if (rsOMOP.next()) {
-				allergy_intolerance_id = rsOMOP
-						.getLong("ALLERGY_INTOLERANCE_ID");
-			}
+//			rsOMOP = stmtOMOP
+//					.executeQuery("SELECT ALLERGY_INTOLERANCE_ID FROM ALLERGY_INTOLERANCE ORDER BY ALLERGY_INTOLERANCE_ID DESC");
+//			if (rsOMOP.next()) {
+//				allergy_intolerance_id = rsOMOP
+//						.getLong("ALLERGY_INTOLERANCE_ID");
+//			}
 
 			pstmtOMOP = connOMOP
-					.prepareStatement("INSERT INTO ALLERGY_INTOLERANCE (ALLERGY_INTOLERANCE_ID, PERSON_ID, REPORTER_PERSON_ID, RECORDER_PERSON_ID, SUBSTANCE_CONCEPT_ID, STATUS, CRITICALITY, CATEGORY, REACTION_DESCRIPTION, LASTOCCURRENCE, ALLERGY_INTOLERANCE_SOURCE_VALUE, COMMENT) VALUES "
-							+ "(?,?,?,?,?,?,?,?,?,?,?,?)");
+					.prepareStatement("INSERT INTO ALLERGY_INTOLERANCE (PERSON_ID, REPORTER_PERSON_ID, RECORDER_PERSON_ID, SUBSTANCE_CONCEPT_ID, STATUS, CRITICALITY, CATEGORY, REACTION_DESCRIPTION, LASTOCCURRENCE, ALLERGY_INTOLERANCE_SOURCE_VALUE, COMMENT) VALUES "
+							+ "(?,?,?,?,?,?,?,?,?,?,?)", Statement.RETURN_GENERATED_KEYS);
 			rsExact = stmtExact.executeQuery("SELECT * FROM ALLERGY");
 			while (rsExact.next()) {
 				// Get person_id.
@@ -2925,30 +3025,33 @@ public class DBMapMain {
 				}
 				String reaction_desc = rsExact.getString("REACTION");
 
-				pstmtOMOP.setLong(1, ++allergy_intolerance_id);
-				pstmtOMOP.setLong(2, person_id);
+//				pstmtOMOP.setLong(1, ++allergy_intolerance_id);
+				pstmtOMOP.setLong(1, person_id);
 				if (rsExact.getString("INFORMATION_SOURCE").equalsIgnoreCase(
 						"patient")) {
-					pstmtOMOP.setLong(3, person_id);
+					pstmtOMOP.setLong(2, person_id);
 				} else {
-					pstmtOMOP.setNull(3, Types.NULL);
+					pstmtOMOP.setNull(2, Types.NULL);
 				}
-				pstmtOMOP.setNull(4, Types.NULL);
-				pstmtOMOP.setLong(5, substance_concept_id);
-				pstmtOMOP.setString(6, "confirmed");
-				pstmtOMOP.setString(7, criticality);
-				pstmtOMOP.setString(8, category);
+				pstmtOMOP.setNull(3, Types.NULL);
+				pstmtOMOP.setLong(4, substance_concept_id);
+				pstmtOMOP.setString(5, "confirmed");
+				pstmtOMOP.setString(6, criticality);
+				pstmtOMOP.setString(7, category);
 				if (reaction_desc != null && !reaction_desc.isEmpty())
-					pstmtOMOP.setString(9, reaction_desc);
+					pstmtOMOP.setString(8, reaction_desc);
 				else 
-					pstmtOMOP.setNull(9, Types.NULL);
-				pstmtOMOP.setDate(10, onset_date);
-				pstmtOMOP.setString(11, drug_code);
-				pstmtOMOP.setString(12, rsExact.getString("ALLERGEN"));
+					pstmtOMOP.setNull(8, Types.NULL);
+				pstmtOMOP.setDate(9, onset_date);
+				pstmtOMOP.setString(10, drug_code);
+				pstmtOMOP.setString(11, rsExact.getString("ALLERGEN"));
 
+				pstmtOMOP.executeUpdate();
+				ResultSet tableKeys = pstmtOMOP.getGeneratedKeys();
+				tableKeys.next();
+				allergy_intolerance_id = tableKeys.getInt(1);
 				System.out.println("Adding Allergy [" + allergy_intolerance_id
 						+ "]");
-				pstmtOMOP.executeUpdate();
 
 			}
 
@@ -2991,18 +3094,18 @@ public class DBMapMain {
 			stmtRxNORM = connRxNORM.createStatement();
 
 			long immunization_id = 0;
-			rsOMOP = stmtOMOP
-					.executeQuery("SELECT IMMUNIZATION_ID FROM IMMUNIZATION ORDER BY IMMUNIZATION_ID DESC");
-			if (rsOMOP.next()) {
-				immunization_id = rsOMOP.getLong("IMMUNIZATION_ID");
-			}
+//			rsOMOP = stmtOMOP
+//					.executeQuery("SELECT IMMUNIZATION_ID FROM IMMUNIZATION ORDER BY IMMUNIZATION_ID DESC");
+//			if (rsOMOP.next()) {
+//				immunization_id = rsOMOP.getLong("IMMUNIZATION_ID");
+//			}
 
 			pstmtOMOP = connOMOP
-					.prepareStatement("INSERT INTO IMMUNIZATION (IMMUNIZATION_ID, PERSON_ID, ADMINISTERED_DATE, "
+					.prepareStatement("INSERT INTO IMMUNIZATION (PERSON_ID, ADMINISTERED_DATE, "
 							+ "VACCINE_CONCEPT_ID, WASNOTGIVEN, REPORTED, PERFORMER_PROVIDER_ID, REQUESTER_PROVIDER_ID, DISPLAY, "
 							+ "VISIT_OCCURRENCE_ID, MANUFACTURER_PROVIDER_ID, LOTNUMBER, DOSEQTY, EXPLANATION_REASON_CONCEPT_ID, "
 							+ "EXPLANATION_REASONNOTGIVEN_CONCEPT_ID, IMMUNIZATION_SOURCE_VALUE) VALUES "
-							+ "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+							+ "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", Statement.RETURN_GENERATED_KEYS);
 			rsExact = stmtExact.executeQuery("SELECT * FROM IMMUNIZATION");
 			while (rsExact.next()) {
 				String member_id = rsExact.getString("MEMBER_ID");
@@ -3113,26 +3216,30 @@ public class DBMapMain {
 //				String manufact = rsExact.getString("MANUFACTURER");
 				String lot_number = rsExact.getString("LOT_NUMBER");
 
-				pstmtOMOP.setLong(1, ++immunization_id);
-				pstmtOMOP.setLong(2, person_id);
-				pstmtOMOP.setTimestamp(3, immunization_ts);
-				pstmtOMOP.setLong(4, vaccine_concept_id);
-				pstmtOMOP.setInt(5, 0);
-				pstmtOMOP.setInt(6, 1);
-				pstmtOMOP.setLong(7, provider_id);
-				pstmtOMOP.setNull(8, Types.NULL);
-				pstmtOMOP.setString(9, rsExact.getString("VACCINE_NAME"));
-				pstmtOMOP.setLong(10, visit_occurrence_id);
-				pstmtOMOP.setNull(11, Types.NULL);
-				pstmtOMOP.setString(12, lot_number);
-				pstmtOMOP.setString(13, rsExact.getString("DOSE"));
+//				pstmtOMOP.setLong(1, ++immunization_id);
+				pstmtOMOP.setLong(1, person_id);
+				pstmtOMOP.setTimestamp(2, immunization_ts);
+				pstmtOMOP.setLong(3, vaccine_concept_id);
+				pstmtOMOP.setInt(4, 0);
+				pstmtOMOP.setInt(5, 1);
+				pstmtOMOP.setLong(6, provider_id);
+				pstmtOMOP.setNull(7, Types.NULL);
+				pstmtOMOP.setString(8, rsExact.getString("VACCINE_NAME"));
+				pstmtOMOP.setLong(9, visit_occurrence_id);
+				pstmtOMOP.setNull(10, Types.NULL);
+				pstmtOMOP.setString(11, lot_number);
+				pstmtOMOP.setString(12, rsExact.getString("DOSE"));
+				pstmtOMOP.setNull(13, Types.NULL);
 				pstmtOMOP.setNull(14, Types.NULL);
-				pstmtOMOP.setNull(15, Types.NULL);
-				pstmtOMOP.setString(16, cvx_code);
+				pstmtOMOP.setString(15, cvx_code);
 
+				pstmtOMOP.executeUpdate();
+				ResultSet tableKeys = pstmtOMOP.getGeneratedKeys();
+				tableKeys.next();
+				immunization_id = tableKeys.getInt(1);
+				
 				System.out.println("Adding immunization [" + immunization_id
 						+ "] added");
-				pstmtOMOP.executeUpdate();
 			}
 
 			stmtExact.close();
