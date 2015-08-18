@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+// DO NOT DELETE ORGANIZATION ID!!!
+
 public class DBMapMain {
 	Connection connExact = null;
 	Connection connOMOP = null;
@@ -114,6 +116,7 @@ public class DBMapMain {
 	static long bmi_cid = 3038553;
 	static long systolic_BP_cid = 3004249;
 	static long diastolic_BP_cid = 3012888;
+	static long systolic_diastolic_BP_cid = 40758413;
 
 	// vital units
 	static long height_in_cid = 9330; // [in_us]
@@ -656,7 +659,7 @@ public class DBMapMain {
 						if ((keywords.contains("shortness")
 								&& keywords.contains("breath")) 
 								|| keywords.contains("sob")) {
-							condition_concept_ids.add(new Long(4118758));
+							condition_concept_ids.add(new Long(312437));
 						}
 						if (keywords.contains("increased")
 								&& keywords.contains("thirst")) {
@@ -1477,14 +1480,20 @@ public class DBMapMain {
 									+ "'"
 									+ " AND TIME(OBSERVATION_TIME) = '"
 									+ tfs + "'");
+					
 					if (rsCheck.next()) {
 						System.out.println("BP [SystolicBP] ("
 								+ rsCheck.getLong("OBSERVATION_ID") + ") at "
 								+ rsCheck.getString("DATE") + " "
 								+ rsCheck.getString("TIME") + " exists");
 					} else {
+						// store observation_ids for grouped BP
+						long systolic_ob_id;
+						long diastolic_ob_id;
+						
 						// Insert the BP.
 						observation_id++;
+						systolic_ob_id = observation_id;
 						pstmtOMOP.setLong(1, observation_id);
 						pstmtOMOP.setLong(2, person_id);
 						pstmtOMOP.setLong(3, systolic_BP_cid);
@@ -1515,6 +1524,8 @@ public class DBMapMain {
 						pstmtOMOP.executeUpdate();
 
 						observation_id++;
+						
+						diastolic_ob_id = observation_id;
 						pstmtOMOP.setLong(1, observation_id);
 						pstmtOMOP.setLong(2, person_id);
 						pstmtOMOP.setLong(3, diastolic_BP_cid);
@@ -1545,8 +1556,41 @@ public class DBMapMain {
 								+ observation_id + ")");
 						pstmtOMOP.executeUpdate();
 
-					}
+						// Add group BP.
+						observation_id++;
+						pstmtOMOP.setLong(1, observation_id);
+						pstmtOMOP.setLong(2, person_id);
+						pstmtOMOP.setLong(3, systolic_diastolic_BP_cid);
+						pstmtOMOP.setDate(4, new Date(obs_date.getTime()));
+						pstmtOMOP.setTimestamp(5, obs_date);
+						pstmtOMOP.setNull(6, Types.NULL);
+						pstmtOMOP.setString(7, "Blood pressure "+systolicBP_value+"/"+diastolicBP_value+" mmHg");
+						pstmtOMOP.setNull(8, Types.NULL);
+						pstmtOMOP.setLong(9, BP_unit_cid);
+						pstmtOMOP.setNull(10, Types.NULL);
+						pstmtOMOP.setNull(11, Types.NULL);
+						pstmtOMOP.setLong(12, observation_text);
+						if (provider_id != 0) {
+							pstmtOMOP.setLong(13, provider_id);
+						} else {
+							pstmtOMOP.setNull(13, Types.NULL);
+						}
+						// We put source of these two BP values here. This is
+						// component type. So, use COMP tag. Then put systolic and diastolic 
+						// observation IDs with comma separation
+						pstmtOMOP.setString(14, "COMP,"+systolic_ob_id+","+diastolic_ob_id);
+						pstmtOMOP.setString(15, "mm[Hg]");
+						if (visit_occurrence_id == 0) {
+							pstmtOMOP.setNull(16, Types.NULL);
+						} else {
+							pstmtOMOP.setLong(16, visit_occurrence_id);
+						}
 
+						System.out.println("Adding GroupBP ("
+								+ observation_id + ")");
+						pstmtOMOP.executeUpdate();
+					}
+					
 					// Heart Rate (Pulse) ***************************
 					String heartrate_value = rsExact.getString("PULSE");
 
@@ -1991,6 +2035,7 @@ public class DBMapMain {
 		String SQL_STATEMENT_LOCATION = "INSERT INTO LOCATION"
 				+ " (LOCATION_ID, ADDRESS_1, ADDRESS_2, CITY, STATE, ZIP, LOCATION_SOURCE_VALUE) VALUES "
 				+ " (?, ? ,?, ?, ?, ?, ?)";
+		String SQL_STATEMENT_F_LOCATION = "INSERT INTO F_LOCATION (LOCATION_ID) VALUES (?)";
 		String SQL_STATEMENT_LOCATIONID = "SELECT LOCATION_ID FROM LOCATION ORDER BY LOCATION_ID DESC";
 
 		long person_id = 0;
@@ -2013,6 +2058,8 @@ public class DBMapMain {
 					.prepareStatement(SQL_STATEMENT_TO_F_PERSON);
 			PreparedStatement pstmt_location = connOMOP
 					.prepareStatement(SQL_STATEMENT_LOCATION);
+			PreparedStatement pstmt_f_location = connOMOP
+					.prepareStatement(SQL_STATEMENT_F_LOCATION);
 
 			stmtExact = connExact.createStatement();
 			rsExact = stmtExact.executeQuery("SELECT * FROM ENROLLMENT");
@@ -2084,6 +2131,9 @@ public class DBMapMain {
 					pstmt_location.setString(6, zip);
 					pstmt_location.setString(7, ExactMemberID);
 					pstmt_location.executeUpdate();
+					
+					pstmt_f_location.setLong(1, location_id);
+					pstmt_f_location.executeUpdate();
 				}
 
 				pstmt_person.setLong(7, actual_location_id);
@@ -2130,6 +2180,8 @@ public class DBMapMain {
 			stmtOMOP.close();
 			pstmt_location.clearParameters();
 			pstmt_location.close();
+			pstmt_f_location.clearParameters();
+			pstmt_f_location.close();
 			pstmt_person.clearParameters();
 			pstmt_person.close();
 			pstmt_f_person.clearParameters();
@@ -2356,6 +2408,7 @@ public class DBMapMain {
 		} catch (SQLException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+			System.exit(1);
 		} finally {
 			try {
 				connExact.close();
@@ -3002,7 +3055,7 @@ public class DBMapMain {
 					// ndc_code = ndc_code.replace("-0", "-");
 					if (ndc_code.equalsIgnoreCase("49281-0400-05")) {
 						ndc_code = "49281-400-05"; // :( darn...
-					}
+					} 
 
 					// Now search this in RxNORM database.
 					stmtRxNORM = connRxNORM.createStatement();
@@ -3163,40 +3216,40 @@ public class DBMapMain {
 
 	public static void main(String[] args) {
 		DBMapMain myClass = new DBMapMain();
-//		System.out.println("--- Populating Provider/CareSite/Organization");
-//		myClass.provider_map();
-//
-//		System.out.println("--- Populating Persons ---");
-//		myClass.enrollment_map();
-//
-//		System.out.println("--- Populating Conditions ---");
-//		myClass.problem_map();
-//
-//		System.out.println("--- Populating Encounters ---");
-//		myClass.encounters_map();
-//
-//		System.out.println("--- Populating Vitals ---");
-//		myClass.vitals_map();
-//
-//		System.out.println("--- Populating Lab Data ---");
-//		myClass.labs_map();
-//
-//		System.out.println("--- Populating MedicationPrescription ---");
-//		myClass.medication_orders_map();
-//
-//		System.out.println("--- Populating MedicationDispense ---");
-//		myClass.medication_fulfillment_map();
-//
-//		System.out.println("--- Populating Allergies ---");
-//		myClass.allergy_map();
+		System.out.println("--- Populating Provider/CareSite/Organization");
+		myClass.provider_map();
+
+		System.out.println("--- Populating Persons ---");
+		myClass.enrollment_map();
+
+		System.out.println("--- Populating Conditions ---");
+		myClass.problem_map();
+
+		System.out.println("--- Populating Encounters ---");
+		myClass.encounters_map();
+
+		System.out.println("--- Populating Vitals ---");
+		myClass.vitals_map();
+
+		System.out.println("--- Populating Lab Data ---");
+		myClass.labs_map();
+
+		System.out.println("--- Populating MedicationPrescription ---");
+		myClass.medication_orders_map();
+
+		System.out.println("--- Populating MedicationDispense ---");
+		myClass.medication_fulfillment_map();
+
+		System.out.println("--- Populating Allergies ---");
+		myClass.allergy_map();
 		myClass.allergy_add_reaction();
 		
-//
-//		System.out.println("--- Populating Immunizations ---");
-//		myClass.immunization_map();
-//
-//		System.out.println("--- Populating Deaths ---");
-//		myClass.death_map();
+
+		System.out.println("--- Populating Immunizations ---");
+		myClass.immunization_map();
+
+		System.out.println("--- Populating Deaths ---");
+		myClass.death_map();
 	}
 
 }
